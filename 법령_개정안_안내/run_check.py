@@ -60,7 +60,16 @@ def main(argv):
 
     if crawl:
         print(f"\n[1/2] 목록 수집 — 최근 {lookback}일 구간")
-        table_update(lookback_days=lookback)
+        new_tables = table_update(lookback_days=lookback)
+        ## 새로 등록된 항목을 화면에 남긴다.
+        ## 대부분은 감시 대상 163건과 무관하지만, 무엇이 들어왔는지는 보여야 한다.
+        ## (Excel 창을 끄고 실행하므로 노트북의 xw.view 를 이 출력이 대신한다)
+        for new_table in new_tables or []:
+            print(f"\n  [신규 등록 {len(new_table)}건]")
+            with pd.option_context("display.max_colwidth", 45, "display.width", 200):
+                print(new_table.head(30).to_string(index=False))
+            if len(new_table) > 30:
+                print(f"  ... 외 {len(new_table) - 30}건")
     else:
         print("\n[1/2] 목록 수집 건너뜀 (--no-crawl)")
 

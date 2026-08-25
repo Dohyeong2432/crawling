@@ -224,3 +224,7 @@ def table_update(lookback_days=LOOKBACK_DAYS):
         update_raw_excel()
     else:
         print(f'({today})_새로 등록된 법령/행정규칙이 없습니다.')
+
+    ## 호출한 쪽에서 신규 항목을 직접 출력할 수 있도록 돌려준다.
+    ## (Excel 창을 끄고 실행할 때는 xw.view 대신 이 값을 쓴다)
+    return new_table_list
