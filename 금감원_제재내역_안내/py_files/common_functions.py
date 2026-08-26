@@ -170,6 +170,20 @@ def remove_dup_files(download_folder, remove_file):
         if fn.find(remove_file)>-1:        
             os.remove(os.path.join(folder_path, file))
 
+## 방금 내려받은 파일을 지운다.
+## Windows 에서는 브라우저가 파일을 잠시 붙들고 있어 곧바로 지우면 실패할 수 있으므로
+## 짧게 기다리며 몇 번 다시 시도한다.
+def remove_downloaded_file(path, attempts=5, interval=0.4):
+    for attempt in range(attempts):
+        try:
+            os.remove(path)
+            return True
+        except OSError:
+            if attempt == attempts - 1:
+                return False
+            time.sleep(interval)
+    return False
+
 ## 안내할 제재리스트 찾기
 def get_notify_list(min_date, find_categories=None, find_pdf_keywords=None, download_folder=None):
     ## 조건을 따로 넘기지 않으면 이 파일 상단의 공용 상수를 사용한다.
@@ -186,6 +200,9 @@ def get_notify_list(min_date, find_categories=None, find_pdf_keywords=None, down
     send_df = []
     send_files = []
     find_keywords_list = []
+    removed_files = []  ## 안내 대상이 아니어서 지운 PDF
+    unremoved_files = []  ## 지우려 했으나 실패한 PDF
+    started_at = time.time()  ## 이 시각 이후 저장된 파일이 이번 실행의 다운로드분
     find_continue = True
     for page_num in range(1, int(last_page_num)+1):
         if find_continue==False:
@@ -226,7 +243,7 @@ def get_notify_list(min_date, find_categories=None, find_pdf_keywords=None, down
                     break
                 time.sleep(0.2)
             if not os.path.exists(pdf_file):
-                move_to_page(browser, page_num)
+                move_to_page(browser, page_url, page_num)
                 time.sleep(0.3)
                 _, tag_df = get_table_info(browser)
                 continue
@@ -246,12 +263,45 @@ def get_notify_list(min_date, find_categories=None, find_pdf_keywords=None, down
                 send_df.append(table_df.loc[idx].to_frame().T)
                 send_files.append(pdf_file)
                 find_keywords_list.append(find_keywords[1:]) ## 맨처음 콤마(,)는 지우고...
+            else:
+                ## 안내 대상이 아니면 받아둔 PDF 를 지운다.
+                ## 키워드 확인용으로만 내려받은 파일이라 다운로드 폴더에 남길 이유가 없다.
+                if remove_downloaded_file(pdf_file):
+                    removed_files.append(os.path.basename(pdf_file))
+                else:
+                    unremoved_files.append(os.path.basename(pdf_file))
             
             move_to_page(browser, page_url, page_num)
             time.sleep(0.3)
             _, tag_df = get_table_info(browser)
         
     
+    ## 마무리 정리.
+    ## 행마다 지워도, 삭제 직후 브라우저가 같은 이름으로 파일을 다시 쓰는 경우가 있어
+    ## 파일이 되살아난다. 그래서 끝에서 한 번 더 훑는다.
+    ## 기준: 이번 실행 중에 저장되었고(started_at 이후), 안내 대상이 아닌 PDF.
+    keep = set(os.path.abspath(f) for f in send_files)
+    for filename in os.listdir(download_folder):
+        file_path = os.path.join(download_folder, filename)
+        if not os.path.isfile(file_path) or os.path.splitext(filename)[1].lower() != '.pdf':
+            continue
+        if os.path.abspath(file_path) in keep:          ## 안내 대상은 남긴다
+            continue
+        if os.path.getmtime(file_path) < started_at:    ## 이번 실행과 무관한 기존 파일
+            continue
+        if remove_downloaded_file(file_path):
+            if filename not in removed_files:
+                removed_files.append(filename)
+        elif filename not in unremoved_files:
+            unremoved_files.append(filename)
+
+    if removed_files:
+        print(f'안내 대상이 아닌 PDF {len(removed_files)}건을 다운로드 폴더에서 삭제했습니다.')
+    if unremoved_files:
+        print(f'[알림] 아래 {len(unremoved_files)}건은 삭제하지 못했습니다. 직접 정리해주세요.')
+        for name in unremoved_files:
+            print(f'         - {name}')
+
     if send_df:
         send_df = pd.concat(send_df)
         send_df['find_keywords'] = find_keywords_list
