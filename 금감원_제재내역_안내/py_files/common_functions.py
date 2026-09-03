@@ -73,69 +73,46 @@ def move_to_fss_home(browser):
 ## 페이지 정보(url)와 마지막 페이지 번호를 가져옴
 ## 페이지 정보(url) 주소의 pageIndex 값을 변경하면서 페이지 이동함
 def get_last_page_info(browser):
-    find_url_yn = False
-    last_list_yn = True 
+    """목록 페이지의 URL(파라미터 포함)과 마지막 페이지 번호를 반환한다.
 
+    [2026-09 사이트 개편]
+    예전에는 'pagination-set' 안의 '마지막목록' 버튼을 클릭해 마지막 페이지로 갔다.
+    개편 후 그 클래스와 버튼이 모두 사라졌고, 지금은 이런 구조다.
+        <ul class="pagination-krsd pagination-centered">
+            <a href="javascript:fnSearch(2)">2</a> ... <a href="javascript:fnSearch(26)">26</a>
+    - 보이는 링크의 fnSearch(N) 중 가장 큰 N 이 마지막 페이지다.
+      (가운데 '...' 링크가 마지막 페이지로 바로 가는 역할을 한다)
+    - 첫 화면 URL 에는 pageIndex 가 없다. fnSearch 를 한 번 실행해야
+      pageIndex/sdate/edate 등 파라미터가 붙은 URL 이 만들어지고,
+      그래야 move_to_page() 가 pageIndex 만 바꿔가며 이동할 수 있다.
     """
-    ### 260227 업데이트 ###
-        move_to_fss_home()으로 이동하면 주소에 페이지 번호가 없음
-        페이지가 많아지만 연초에는 없던, 마지막 목록이 나타나고, 마지막 목록을 클릭하면 주소가 변화면서 마지막 페이지를 잡는 구조
-            그러므로 마지막목록이 있으면 마지막목록 이동후 pageIndex를 찾고, 아니면 현재 active페이지의 페이지 번호 중 맨 마지막 페이지를 마지막 페이지로 특정
-        특정 목록을 클릭해야 주소가 변홤(세부적인 파라미터들이 생기기 시작)
-    """
-    ## (260227) 새해가 되면 마지막목록이 disabled되므로 분개를 넣어줌 이부분 확인
-    for div_tags in browser.find_elements(By.CLASS_NAME, 'pagination-set'):
-        for li_tag in div_tags.find_elements(By.TAG_NAME, 'li'):
-            class_name = li_tag.get_attribute('class')
-            if 'end' in class_name:
-                if 'disabled' in class_name: ## 마지막 페이지가 비활성화 되어 있으면 last_list_yn을 False로
-                    last_list_yn = False
+    page_nums = []
+    for ul_tag in browser.find_elements(By.TAG_NAME, 'ul'):
+        ul_class = ul_tag.get_attribute('class') or ''
+        if 'pagination' not in ul_class:
+            continue
+        for a_tag in ul_tag.find_elements(By.TAG_NAME, 'a'):
+            href = a_tag.get_attribute('href') or ''
+            match = re.search(r'fnSearch\((\d+)\)', href)
+            if match:
+                page_nums.append(int(match.group(1)))
 
-    if last_list_yn: ## 마지막목록이 있으면 원래 방법대로 처리하고
-        for div_tags in browser.find_elements(By.CLASS_NAME, 'pagination-set'): ## (260227) pagination-set은 1개임
-            for a_tag in div_tags.find_elements(By.TAG_NAME, 'a'):
-                find_text = '마지막목록'
-                a_tag_title = re.sub(r'[^가-힣]', '', a_tag.get_attribute('title')).strip()
-                if a_tag_title==find_text:
-                    find_url_yn = True
-                    a_tag.click()
-                    break
-                    
-    else: ## 마지막 목록이 없으면
+    if not page_nums:
+        print('마지막 페이지를 찾는데 실패하였음 (페이지 링크를 찾지 못함)')
+        return None
 
-        ## ul 태그 안에 숨겨진 마지막 페이지를 찾기. 먼저 centered 라는 클래스 검색(By.CLASS_NAME으로 검색안됨)
-        for ul_tag in browser.find_elements(By.TAG_NAME, 'ul'):
-            ul_class_name = ul_tag.get_attribute('class')
-            if "pagination-centered" in ul_class_name:
-                break
+    last_page_num = max(page_nums)
 
-        ## 마지막 페이지를 일단 찾고
-        page_nums = []
-        for span_tag in ul_tag.find_elements(By.TAG_NAME, 'span'):
-            if span_tag.text:
-                page_nums.append(span_tag.text.strip())        
-        
-        ## 마지막 페이지로 이동
-        for span_tag in ul_tag.find_elements(By.TAG_NAME, 'span'):
-            if span_tag.text:
-                if span_tag.text.strip()==page_nums[-1]:
-                    find_url_yn = True
-                    span_tag.click()
-                    break
-    
-    if find_url_yn:
-        ## 파라미터가 포함된 페이지 주소를 받음, move_to_page에서 본 주소의 페이지 번호만 정규표현식으로 수정하며 이동
-        page_url = browser.current_url
-        
-        match = re.search(r'pageIndex=(\d+)', page_url)
-        if match:
-            page_idx = match.group(1)        
-        
-        time.sleep(0.1)        
-        return page_url, page_idx
-        
-    else:
-        print('마지막 페이지를 찾는데 실패하였음')    
+    ## 파라미터가 붙은 URL 을 얻기 위해 1페이지로 한 번 이동한다.
+    browser.execute_script('fnSearch(1);')
+    time.sleep(1.0)
+    page_url = browser.current_url
+
+    if not re.search(r'pageIndex=\d+', page_url):
+        print(f'마지막 페이지를 찾는데 실패하였음 (URL 에 pageIndex 가 없음: {page_url})')
+        return None
+
+    return page_url, last_page_num
 
 ## 페이지 정보와 페이지 넘버로 페이지를 이동
 def move_to_page(browser, url, page_num):
@@ -145,11 +122,25 @@ def move_to_page(browser, url, page_num):
 
 ## 해당페이지의 테이블 정보와 태그를 dataframe에 저장하고 반환
 def get_table_info(browser):
-    list_tag = browser.find_element(By.CLASS_NAME, 'bd-list')
-    table_tag = list_tag.find_element(By.TAG_NAME, 'table')
+    """현재 페이지의 표 내용과 각 칸의 태그를 dataframe 두 개로 반환한다.
+
+    [2026-09 사이트 개편]
+    예전에는 'bd-list' div 안에서 표를 찾았는데 그 클래스가 사라졌다.
+    지금은 <div class="krds-table-wrap"><table class="tbl col list-data"> 구조라
+    표를 직접 찾는다. 컬럼 구성(번호/제재대상기관/제재조치요구일/제재조치요구내용/
+    관련부서/조회수)은 개편 전후가 같다.
+    """
+    table_tag = None
+    for candidate in browser.find_elements(By.TAG_NAME, 'table'):
+        if 'list-data' in (candidate.get_attribute('class') or ''):
+            table_tag = candidate
+            break
+    if table_tag is None:  ## 클래스가 또 바뀌었을 때를 대비한 대비책
+        table_tag = browser.find_element(By.TAG_NAME, 'table')
+
     head_tag = table_tag.find_element(By.TAG_NAME, 'thead')
     body_tag = table_tag.find_element(By.TAG_NAME, 'tbody')
-    
+
     table_df_cols = []
     for th_tag in head_tag.find_elements(By.TAG_NAME, 'th'):
         table_df_cols.append(th_tag.text.strip())
