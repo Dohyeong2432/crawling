@@ -54,7 +54,7 @@ def move_to_page(browser, page_num):
             break    
 
 ## 현재 페이지의 테이블 정보를 확인하고, 최신정보면 파일을 다운로드해 이메일까지 발송함
-def download_send_mail(browser, today):
+def download_send_mail(browser, today, title_keywords=None):
     sended_mail_subjects = []
     sended_mail_dates = []
     list_tag = browser.find_element(By.CLASS_NAME, 'board-list-wrap')
@@ -68,7 +68,7 @@ def download_send_mail(browser, today):
         
         ## 최신 보도자료면 다운로드함
         download_files = []
-        if date>=today:        
+        if date>=today and subject_matches(subject, title_keywords):
             for file_tag in li_tag.find_elements(By.CLASS_NAME, 'file-list'):
                 file_type = file_tag.text.split('.')[-1]
                 if re.search('hwp', file_type) and re.search('hwpx', file_type) is None:                
@@ -99,14 +99,14 @@ def download_send_mail(browser, today):
 ## 최종적으로 새로나온 보도자료들을 수집하고 이메일까지 보냄
 ## 1페이지 이메일 발송 후, 2페이지까지 보도자료가 있으면 페이지 이동도함
 #############################################################################
-def notice_fsc_press(browser, today):
+def notice_fsc_press(browser, today, title_keywords=None):
     ## 보도자료가 한번에 10페이지 이상 올라올 가능성은 없음. 그러므로 최대 10페이지까지만 검색함
     last_page_num = 10
 
     move_to_home(browser, 'fsc_press')
     mail_subject_list, mail_date_list = [], []
     for page_num in range(1, last_page_num+1):  ## page_num = 지금 처리 중인 페이지
-        sended_mail_subjects, sended_mail_dates = download_send_mail(browser, today) ## 1페이지는 무조건 작업을 하고
+        sended_mail_subjects, sended_mail_dates = download_send_mail(browser, today, title_keywords) ## 1페이지는 무조건 작업을 하고
         mail_subject_list.extend(sended_mail_subjects)
         mail_date_list.extend(sended_mail_dates)
         

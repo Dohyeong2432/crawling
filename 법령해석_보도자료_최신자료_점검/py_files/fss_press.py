@@ -97,7 +97,7 @@ def get_post_info(browser):
 ## 최종적으로 새로나온 보도자료들을 수집하고 이메일까지 보냄
 ## 1페이지 이메일 발송 후, 2페이지까지 보도자료가 있으면 페이지 이동도함
 #############################################################################
-def notice_fsc_press(browser, today):
+def notice_fsc_press(browser, today, title_keywords=None):
     ## 보도자료가 한번에 10페이지 이상 올라올 가능성은 없음. 그러므로 최대 10페이지까지만 검색함
     last_page_num = 10
 
@@ -121,7 +121,7 @@ def notice_fsc_press(browser, today):
             subject = td_tag_list[table_cols.index('제목')].text
             mail_title = f"(금감원보도자료)_{date}_{subject}" ## 메일 제목 양식 수정
             
-            if date>=today: ## 오늘 이후로 업데이트 된 내용이면 첨부
+            if date>=today and subject_matches(subject, title_keywords): ## 오늘 이후 + 제목 조건에 맞으면 첨부
                 td_tag_list[table_cols.index('제목')].click() ## 해당 본문 클릭
                 mail_body, files = get_post_info(browser) ## 본문의 내용과 파일을 다운로드 한후
                 send_mail(mail_title, mail_body, files) ## 이메일 발송

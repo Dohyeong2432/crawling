@@ -92,7 +92,7 @@ def get_file_list(browser):
                 files.append(re.sub(" ", "", file_name)) ## 파일이름은 공백을 제거하고. 확장자 없이 넘김    
     return files
 
-def download_send_mail(browser, today):
+def download_send_mail(browser, today, title_keywords=None):
     sended_mail_subjects, sended_mail_dates = [], []
     table_tag = browser.find_element(By.CLASS_NAME, 'bo_list')
     ## 표가 뜰때까지 잠시 대기
@@ -112,7 +112,7 @@ def download_send_mail(browser, today):
             if re.search('date', span_tag.get_attribute('class')):
                 date = parse_press_date(span_tag.text)
                 break        
-        if date>=today:
+        if date>=today and subject_matches(subject, title_keywords):
             ## 자바스크립트 함수 호출을 위해, 함수평 가져오고 실행
             java_link = subject_tag.find_element(By.TAG_NAME, 'a').get_attribute('href')
             browser.execute_script(java_link)
@@ -135,14 +135,14 @@ def download_send_mail(browser, today):
 ## 최종적으로 새로나온 보도자료들을 수집하고 이메일까지 보냄
 ## 1페이지 이메일 발송 후, 2페이지까지 보도자료가 있으면 페이지 이동도함
 #############################################################################
-def notice_fiu_press(browser, today):
+def notice_fiu_press(browser, today, title_keywords=None):
     ## 보도자료가 한번에 10페이지 이상 올라올 가능성은 없음. 그러므로 최대 10페이지까지만 검색함
     last_page_num = 10    
     
     move_to_home(browser, 'fiu_press')
     mail_subject_list, mail_date_list = [], []
     for page_num in range(1, last_page_num+1):  ## page_num = 지금 처리 중인 페이지
-        sended_mail_subjects, sended_mail_dates = download_send_mail(browser, today) ## 1페이지는 무조건 작업을 하고
+        sended_mail_subjects, sended_mail_dates = download_send_mail(browser, today, title_keywords) ## 1페이지는 무조건 작업을 하고
         mail_subject_list.extend(sended_mail_subjects)
         mail_date_list.extend(sended_mail_dates)
         

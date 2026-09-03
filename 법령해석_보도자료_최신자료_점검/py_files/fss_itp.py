@@ -157,7 +157,7 @@ def update_check(browser, today):
 
 ####################################################################################
 ## 업데이트된 법령이 있는지 체크하고 있으면 최종적으로 실행해 수집후 이메일 보내는 함수
-def notice_fss_ipt(browser, today):
+def notice_fss_ipt(browser, today, title_keywords=None):
     move_to_first_page(browser)
     last_page_num = get_last_page_num(browser)
 
@@ -185,6 +185,9 @@ def notice_fss_ipt(browser, today):
         ## 왜냐하면 업데이트된 항목이 1페이지 이상일 수도 있으므로
         find_continue = (len(table_df)==len(table_df[table_df.등록일>=today])) 
         table_df = table_df[table_df.등록일>=today]
+        ## 제목 조건이 있으면 여기서 더 걸러낸다
+        if title_keywords:
+            table_df = table_df[table_df['제목'].map(lambda s: subject_matches(s, title_keywords))]
         if len(table_df) > 0: ## 찾아야할 테이블이 있다면
             ## 각 항목들을 클릭해서 파일을 다운로드 하고, 본문을 수집한 후 메일까지 발송
             get_page_laws_info(browser, table_df)

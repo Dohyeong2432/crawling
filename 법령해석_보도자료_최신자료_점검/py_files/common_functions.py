@@ -94,6 +94,17 @@ def wait_for_downloads(download_files, timeout=30.0, interval=0.1):
         time.sleep(interval)  ## 반드시 쉬어줄 것. 없으면 CPU 를 100% 점유함
 
 
+## 발송 대상 제목인지 확인한다.
+##   keywords 가 비어 있으면(None/빈 목록) 전부 대상으로 본다.
+## 사용자가 사이트에서 제목을 복사해 넘기는 경우가 많아 띄어쓰기가 어긋나기 쉬우므로,
+## 공백을 모두 없앤 뒤 부분일치로 비교한다.
+def subject_matches(subject, keywords=None):
+    if not keywords:
+        return True
+    text = re.sub(r'\s+', '', str(subject))
+    return any(re.sub(r'\s+', '', str(k)) in text for k in keywords if str(k).strip())
+
+
 ## 게시판의 날짜 문자열에서 날짜만 뽑아 'yymmdd' 로 변환.
 ##
 ## 사이트가 날짜 칸에 다른 정보를 덧붙이는 경우가 있다.
