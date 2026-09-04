@@ -175,6 +175,22 @@ def remove_downloaded_file(path, attempts=5, interval=0.4):
             time.sleep(interval)
     return False
 
+## 기준일을 사이트 형식('YYYYMMDD' 8자리 문자열)으로 맞춘다.
+##
+## 사이트의 제재조치요구일이 8자리 문자열이라 문자열끼리 비교하는데,
+## 형식이 어긋나면 오류 없이 엉뚱하게 동작해서 알아채기 어렵다.
+##   '260820'      -> 모든 행이 '더 오래됨'으로 판정되어 조용히 0건
+##   '2026-08-20'  -> 모든 행이 통과해 전체 페이지를 훑고 PDF 를 대량 내려받음
+##   20260820(int) -> TypeError
+## 그래서 숫자만 남겨 8자리로 통일하고, 안 되면 분명히 알린다.
+def normalize_min_date(value):
+    digits = re.sub(r'[^0-9]', '', str(value))
+    if len(digits) == 6:      ## 260820 -> 20260820
+        digits = '20' + digits
+    if len(digits) != 8:
+        raise ValueError(f"기준일 형식을 알 수 없습니다: {value!r}  (예: '20260820')")
+    return digits
+
 ## 안내할 제재리스트 찾기
 def get_notify_list(min_date, find_categories=None, find_pdf_keywords=None, download_folder=None):
     ## 조건을 따로 넘기지 않으면 이 파일 상단의 공용 상수를 사용한다.
@@ -184,6 +200,7 @@ def get_notify_list(min_date, find_categories=None, find_pdf_keywords=None, down
         find_pdf_keywords = FIND_PDF_KEYWORDS
     if download_folder is None:  ## 지정하지 않으면 .env 의 DOWNLOAD_FOLDER 사용
         download_folder = DOWNLOAD_FOLDER
+    min_date = normalize_min_date(min_date)  ## 형식이 어긋나면 여기서 바로 알림
     browser = get_browser()
     move_to_fss_home(browser)
     page_url, last_page_num = get_last_page_info(browser)

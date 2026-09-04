@@ -40,6 +40,7 @@ from py_files.common_functions import (
     FIND_PDF_KEYWORDS,
     DOWNLOAD_FOLDER,
     get_notify_list,
+    normalize_min_date,
 )
 
 
@@ -50,12 +51,10 @@ def parse_min_date(argv):
     """
     if len(argv) < 2:
         sys.exit("기준일을 넣어주세요.  예)  python run_check.py 20260720")
-    raw = re.sub(r"[^0-9]", "", argv[1])
-    if len(raw) == 6:       ## 260720 -> 20260720
-        raw = "20" + raw
-    if len(raw) != 8:
-        sys.exit(f"날짜 형식을 알 수 없습니다: {argv[1]}  (예: 20260720)")
-    return raw
+    try:
+        return normalize_min_date(argv[1])
+    except ValueError as err:
+        sys.exit(str(err))
 
 
 def main(argv):
