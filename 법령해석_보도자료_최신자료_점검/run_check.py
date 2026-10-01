@@ -97,7 +97,7 @@ def main(argv):
     print(f"점검 완료 — 성공 {len(CHECKS) - len(failed)}/{len(CHECKS)} ({time.time() - started:.0f}초)")
     if failed:
         print(f"실패 : {', '.join(failed)}")
-        print("사이트 구조가 바뀌었을 수 있습니다. 위 오류 내용을 확인하세요.")
+        print("사이트 장애이거나 구조가 바뀌었을 수 있습니다. 위 오류 내용을 확인하세요.")
     print("발송하려면 법령해석_보도자료_최신자료_점검.ipynb 에서")
     print("해당 사이트의 발송 셀을 실행하세요.")
     print("=" * 72)

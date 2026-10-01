@@ -36,10 +36,15 @@ def get_table_data(browser):
 
 ## 새로운 보도자료가 나와있는지 확인
 def update_check(browser, today):
+    """기준일 이후 신규 자료를 보여준다(발송 없음).
+
+    목록이 늦게 그려지면 다시 읽고(retry_read),
+    1페이지가 전부 대상이면 다음 페이지까지 이어서 본다(collect_recent).
+    """
     move_to_home(browser, 'fsc_press')
-    table_df = get_table_data(browser)
-    table_df = table_df[table_df.등록일>=today]
-    if len(table_df) > 0:        
+    table_df = collect_recent(browser, get_table_data, move_to_page, today,
+                              label='(금융위 보도자료)')
+    if len(table_df) > 0:
         print("(금융위 보도자료) 새로 올라온 자료가 있습니다. 아래 표를 참고해주세요.")
         display(table_df)
     else:

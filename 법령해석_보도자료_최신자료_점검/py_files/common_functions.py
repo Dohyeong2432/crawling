@@ -1,4 +1,5 @@
 import warnings, os, re, smtplib, time
+import pandas as pd
 from webdriver_manager.chrome import ChromeDriverManager
 
 from email.mime.text import MIMEText
@@ -119,6 +120,68 @@ def parse_press_date(text):
         raise ValueError(f"날짜를 찾지 못했습니다: {text!r}")
     year, month, day = (int(g) for g in matched.groups())
     return f"{year % 100:02d}{month:02d}{day:02d}"
+
+
+## 목록을 읽을 때까지 몇 번 다시 시도한다.
+##
+## 사이트(특히 금융위)가 느려서, 표가 그려지기 전에 요소를 찾으면
+##   NoSuchElementException (board-list-wrap 없음)  또는
+##   get_num_tag() 가 None 을 돌려줘 AttributeError
+## 가 난다. 구조가 바뀐 게 아니라 단순 지연이므로 기다렸다 다시 읽으면 된다.
+def retry_read(read_func, tries=6, interval=3.0):
+    last_error = None
+    for attempt in range(tries):
+        try:
+            result = read_func()
+            if result is not None:
+                return result
+            last_error = RuntimeError("목록 요소를 찾지 못했습니다(아직 로딩 중)")
+        except Exception as error:
+            last_error = error
+        if attempt < tries - 1:
+            time.sleep(interval)
+    raise last_error
+
+
+## 기준일 이후 자료를 모은다. 한 페이지가 전부 대상이면 다음 페이지까지 이어서 본다.
+##
+## 점검 화면이 1페이지만 보던 탓에, 그 날 올라온 자료가 10건을 넘으면
+## 2페이지의 자료가 화면에 안 보였다(발송은 정상이지만 눈으로 확인이 안 됨).
+##   read_table(browser) -> DataFrame ('등록일' 컬럼 필요)
+##   go_page(browser, page_num) -> 해당 페이지로 이동. None 이면 1페이지만 본다.
+## 사이트가 죽었을 때 뜨는 오류 페이지인지 확인한다.
+## 이걸 구분하지 않으면 '요소를 못 찾음' 으로만 보여서 구조 변경으로 오해하게 된다.
+SERVER_ERROR_SIGNS = ('502', '503', '504', 'Bad Gateway', 'Service Unavailable',
+                      'Gateway Time-out', '서비스 점검')
+
+def check_site_alive(browser, label=""):
+    title = (browser.title or '').strip()
+    for sign in SERVER_ERROR_SIGNS:
+        if sign.lower() in title.lower():
+            raise RuntimeError(
+                f"{label} 사이트에 접속할 수 없습니다(서버 응답: {title}). "
+                f"사이트 장애로 보이므로 잠시 후 다시 시도해주세요.")
+
+
+def collect_recent(browser, read_table, go_page, today, max_pages=5, label=""):
+    check_site_alive(browser, label)
+    collected = []
+    for page in range(1, max_pages + 1):
+        table_df = retry_read(lambda: read_table(browser))
+        recent_df = table_df[table_df.등록일 >= today]
+        collected.append(recent_df)
+
+        ## 이 페이지에 기준일보다 오래된 자료가 섞여 있으면 여기까지가 끝
+        if len(recent_df) < len(table_df) or go_page is None:
+            break
+        if page == max_pages:
+            print(f"[경고] {label} 최대 {max_pages}페이지까지만 확인했습니다. "
+                  f"더 남아 있을 수 있습니다.")
+            break
+        go_page(browser, page + 1)
+        time.sleep(3)
+
+    return pd.concat(collected).reset_index(drop=True)
 
 
 def get_browser():    

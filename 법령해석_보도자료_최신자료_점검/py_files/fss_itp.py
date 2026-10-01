@@ -144,14 +144,31 @@ def get_page_laws_info(browser, table_df):
 
 ## 업데이트된 법령이 있는지만 체크
 def update_check(browser, today):
-    last_page_num = get_last_page_num(browser)
-    table_df, tbody_tag = get_table_data(browser)
-    table_df['등록일'] = table_df['등록일'].map(lambda x: pd.to_datetime(x).strftime("%y%m%d"))
-    
-    table_df = table_df[table_df.등록일>=today]
-    if len(table_df)>0:
+    """기준일 이후 신규 법령해석을 보여준다(발송 없음).
+
+    이 사이트는 get_table_data() 가 (표, tbody) 튜플을 돌려주고,
+    페이지 이동도 하단 번호 링크를 눌러야 해서 별도 래퍼를 쓴다.
+    예전에는 여기서 get_last_page_num() 을 먼저 불렀는데, 로딩 전에
+    get_num_tag() 가 None 을 돌려주면 AttributeError 로 점검이 통째로 실패했다.
+    쓰이지도 않던 호출이라 걷어내고 retry_read 로 대체한다.
+    """
+    def read_table(b):
+        table_df, _ = get_table_data(b)
+        table_df['등록일'] = table_df['등록일'].map(lambda x: pd.to_datetime(x).strftime("%y%m%d"))
+        return table_df
+
+    def go_page(b, page_num):
+        num_tag = retry_read(lambda: get_num_tag(b))
+        for a_tag in num_tag.find_elements(By.TAG_NAME, 'a'):
+            if a_tag.text.strip() == str(page_num):
+                a_tag.click()
+                return
+
+    move_to_home(browser, 'fss_itp')
+    table_df = collect_recent(browser, read_table, go_page, today, label='(법령해석)')
+    if len(table_df) > 0:
         print("(법령해석) 새로 올라온 정보가 있습니다. 아래 표를 참고해주세요.")
-        display(table_df)        
+        display(table_df)
     else:
         print('(법령해석) 새로 올라온 정보는 없습니다.')
 
